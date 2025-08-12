@@ -1,0 +1,13 @@
+# Google Sheets Configuration
+GOOGLE_CREDENTIALS_JSON={"type": "service_account", "project_id": "your-project-id", ...}
+GOOGLE_SPREADSHEET_URL=https://docs.google.com/spreadsheets/d/your-spreadsheet-id/edit
+GOOGLE_WORKSHEET_NAME=Session_Audits
+
+# Streamlit Configuration
+STREAMLIT_SERVER_PORT=8501
+STREAMLIT_SERVER_ADDRESS=0.0.0.0
+
+# App Configuration
+APP_TITLE=Session Audit System
+APP_ICON=📋
+DEBUG_MODE=false

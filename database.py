@@ -1,0 +1,235 @@
+"""
+Google Sheets database integration for Session Audit Form
+Handles reading from and writing to Google Sheets
+"""
+
+import streamlit as st
+import gspread
+from google.oauth2.service_account import Credentials
+import pandas as pd
+from typing import Dict, List, Any, Optional
+import json
+from datetime import datetime
+
+class GoogleSheetsDB:
+    def __init__(self):
+        self.client = None
+        self.sheet = None
+        self.worksheet = None
+        
+    def initialize_connection(self, credentials_json: str, spreadsheet_url: str, worksheet_name: str = "Session_Audits"):
+        """Initialize Google Sheets connection"""
+        try:
+            # Parse credentials
+            credentials_dict = json.loads(credentials_json)
+            
+            # Define the scope
+            scope = [
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive"
+            ]
+            
+            # Create credentials
+            credentials = Credentials.from_service_account_info(credentials_dict, scopes=scope)
+            
+            # Initialize the client
+            self.client = gspread.authorize(credentials)
+            
+            # Open the spreadsheet
+            self.sheet = self.client.open_by_url(spreadsheet_url)
+            
+            # Get or create worksheet
+            try:
+                self.worksheet = self.sheet.worksheet(worksheet_name)
+            except gspread.WorksheetNotFound:
+                self.worksheet = self.sheet.add_worksheet(title=worksheet_name, rows=1000, cols=50)
+                self._initialize_headers()
+            
+            return True
+            
+        except Exception as e:
+            st.error(f"Error connecting to Google Sheets: {str(e)}")
+            return False
+    
+    def initialize_connection_from_secrets(self) -> bool:
+        """Initialize connection using Streamlit secrets. Returns True on success."""
+        try:
+            credentials_json = st.secrets.get("GOOGLE_SHEETS_CREDENTIALS") or st.secrets.get("GOOGLE_CREDENTIALS_JSON")
+            spreadsheet_url = st.secrets.get("GOOGLE_SPREADSHEET_URL") or st.secrets.get("GOOGLE_SHEET_URL")
+            worksheet_name = st.secrets.get("GOOGLE_WORKSHEET_NAME", "Session_Audits")
+            if not credentials_json or not spreadsheet_url:
+                return False
+            return self.initialize_connection(credentials_json, spreadsheet_url, worksheet_name)
+        except Exception as e:
+            st.error(f"Error loading Google Sheets secrets: {str(e)}")
+            return False
+    
+    def _initialize_headers(self):
+        """Initialize headers in the Google Sheet"""
+        headers = [
+            "Timestamp", "Level", "Session type", "Day/Number", "Group Code",
+            "Recorded session link", "Month", "Session Date", "Governorate", "Area",
+            "Center Name", "Instructor Code", "Instructor Name", "Camera",
+            "Camera quality", "Camera Coverage", "Sound", "Internet connection",
+            "Full Session?", "Session duration ( hours)", "Students seated",
+            "Coordinator appearance", "Room adequacy", "Instructor appearance",
+            "Instructor Attitude", "English language of instructor",
+            "Language of instructor (slang language is used)", "Activity", "Break",
+            "Break Time ( Minutes)", "Students feedback average score",
+            "Coordinator feedback score", "Positive Comments", "Negative Comments",
+            "Auditor", "Score", "Session Rating", "Project Coordinator",
+            "Students Comment", "Validity", "Our Comments"
+        ]
+        
+        self.worksheet.update('A1:AN1', [headers])
+    
+    def save_audit_data(self, form_data: Dict[str, Any], score_data: Dict[str, Any]) -> bool:
+        """Save audit data to Google Sheets"""
+        try:
+            if not self.worksheet:
+                st.error("Google Sheets connection not initialized")
+                return False
+            
+            # Prepare data row
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            row_data = [
+                timestamp,
+                form_data.get("Level", ""),
+                form_data.get("Session type", ""),
+                form_data.get("Day/Number", ""),
+                form_data.get("Group Code", ""),
+                form_data.get("Recorded session link", ""),
+                form_data.get("Month", ""),
+                str(form_data.get("Session Date", "")),
+                form_data.get("Governorate", ""),
+                form_data.get("Area", ""),
+                form_data.get("Center Name", ""),
+                form_data.get("Instructor Code", ""),
+                form_data.get("Instructor Name", ""),
+                form_data.get("Camera", ""),
+                form_data.get("Camera quality", ""),
+                form_data.get("Camera Coverage", ""),
+                form_data.get("Sound", ""),
+                form_data.get("Internet connection", ""),
+                form_data.get("Full Session?", ""),
+                form_data.get("Session duration ( hours)", ""),
+                form_data.get("Students seated", ""),
+                form_data.get("Coordinator appearance", ""),
+                form_data.get("Room adequacy", ""),
+                form_data.get("Instructor appearance", ""),
+                form_data.get("Instructor Attitude", ""),
+                form_data.get("English language of instructor", ""),
+                form_data.get("Language of instructor (slang language is used)", ""),
+                form_data.get("Activity", ""),
+                form_data.get("Break", ""),
+                form_data.get("Break Time ( Minutes)", ""),
+                form_data.get("Students feedback average score", ""),
+                form_data.get("Coordinator feedback score", ""),
+                form_data.get("Positive Comments", ""),
+                form_data.get("Negative Comments", ""),
+                form_data.get("Auditor", ""),
+                score_data.get("total_score", ""),
+                score_data.get("session_rating", ""),
+                form_data.get("Project Coordinator", ""),
+                form_data.get("Students Comment", ""),
+                form_data.get("Validity", ""),
+                form_data.get("Our Comments", "")
+            ]
+            
+            # Append to sheet
+            self.worksheet.append_row(row_data)
+            return True
+            
+        except Exception as e:
+            st.error(f"Error saving data to Google Sheets: {str(e)}")
+            return False
+    
+    def get_all_data(self) -> Optional[pd.DataFrame]:
+        """Retrieve all data from Google Sheets as DataFrame"""
+        try:
+            if not self.worksheet:
+                return None
+            
+            data = self.worksheet.get_all_records()
+            return pd.DataFrame(data)
+            
+        except Exception as e:
+            st.error(f"Error retrieving data from Google Sheets: {str(e)}")
+            return None
+    
+    def get_data_by_filter(self, column: str, value: Any) -> Optional[pd.DataFrame]:
+        """Retrieve filtered data from Google Sheets"""
+        try:
+            df = self.get_all_data()
+            if df is not None and column in df.columns:
+                return df[df[column] == value]
+            return None
+            
+        except Exception as e:
+            st.error(f"Error filtering data: {str(e)}")
+            return None
+    
+    def update_record(self, row_index: int, column: str, new_value: Any) -> bool:
+        """Update a specific cell in the Google Sheet"""
+        try:
+            if not self.worksheet:
+                return False
+            
+            # Find column index
+            headers = self.worksheet.row_values(1)
+            if column not in headers:
+                st.error(f"Column '{column}' not found")
+                return False
+            
+            col_index = headers.index(column) + 1
+            
+            # Update cell (row_index + 2 because of header and 1-indexed)
+            self.worksheet.update_cell(row_index + 2, col_index, new_value)
+            return True
+            
+        except Exception as e:
+            st.error(f"Error updating record: {str(e)}")
+            return False
+    
+    def delete_record(self, row_index: int) -> bool:
+        """Delete a record from Google Sheets"""
+        try:
+            if not self.worksheet:
+                return False
+            
+            # Delete row (row_index + 2 because of header and 1-indexed)
+            self.worksheet.delete_rows(row_index + 2)
+            return True
+            
+        except Exception as e:
+            st.error(f"Error deleting record: {str(e)}")
+            return False
+    
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get basic statistics from the data"""
+        try:
+            df = self.get_all_data()
+            if df is None or df.empty:
+                return {}
+            
+            stats = {
+                "total_records": len(df),
+                "average_score": df["Score"].mean() if "Score" in df.columns else 0,
+                "rating_distribution": df["Session Rating"].value_counts().to_dict() if "Session Rating" in df.columns else {},
+                "latest_entry": df["Timestamp"].max() if "Timestamp" in df.columns else "",
+                "governorate_distribution": df["Governorate"].value_counts().to_dict() if "Governorate" in df.columns else {}
+            }
+            
+            return stats
+            
+        except Exception as e:
+            st.error(f"Error calculating statistics: {str(e)}")
+            return {}
+
+# Global database instance
+db_instance = GoogleSheetsDB()
+
+def get_database():
+    """Get the global database instance"""
+    return db_instance
