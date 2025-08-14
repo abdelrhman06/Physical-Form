@@ -18,20 +18,96 @@ class GoogleSheetsDB:
         self.worksheet = None
         
     def initialize_connection(self, credentials_json: str, spreadsheet_url: str, worksheet_name: str = "Session_Audits"):
-        """Initialize Google Sheets connection"""
+        """Initialize Google Sheets connection - DEPRECATED: Use initialize_connection_from_dict instead"""
         try:
-            st.info("📋 Parsing credentials...")
-            
-            # Parse credentials
             credentials_dict = json.loads(credentials_json)
+            return self.initialize_connection_from_dict(credentials_dict, spreadsheet_url, worksheet_name)
+        except Exception as e:
+            st.error(f"❌ Error parsing credentials: {str(e)}")
+            return False
+    
+    def initialize_connection_from_secrets(self) -> bool:
+        """Initialize connection using Streamlit secrets. Returns True on success."""
+        try:
+            st.info("🔍 Checking Streamlit secrets...")
+            
+            # Check if using TOML sections format
+            if hasattr(st.secrets, 'google_credentials'):
+                st.info("📋 Using TOML sections format...")
+                credentials_dict = {
+                    "type": st.secrets.google_credentials.type,
+                    "project_id": st.secrets.google_credentials.project_id,
+                    "private_key_id": st.secrets.google_credentials.private_key_id,
+                    "private_key": st.secrets.google_credentials.private_key,
+                    "client_email": st.secrets.google_credentials.client_email,
+                    "client_id": st.secrets.google_credentials.client_id,
+                    "auth_uri": st.secrets.google_credentials.auth_uri,
+                    "token_uri": st.secrets.google_credentials.token_uri,
+                    "auth_provider_x509_cert_url": st.secrets.google_credentials.auth_provider_x509_cert_url,
+                    "client_x509_cert_url": st.secrets.google_credentials.client_x509_cert_url,
+                    "universe_domain": st.secrets.google_credentials.universe_domain
+                }
+                spreadsheet_url = st.secrets.google_sheet.url
+                worksheet_name = st.secrets.google_sheet.worksheet
+            else:
+                # Fallback to JSON string format
+                st.info("📋 Using JSON string format...")
+                credentials_json = (
+                    st.secrets.get("GOOGLE_SHEETS_CREDENTIALS") or 
+                    st.secrets.get("GOOGLE_CREDENTIALS_JSON") or
+                    st.secrets.get("credentials_json")
+                )
+                
+                if not credentials_json:
+                    st.error("❌ GOOGLE_SHEETS_CREDENTIALS not found in Streamlit secrets")
+                    st.info("💡 Add credentials in TOML sections format or JSON string format")
+                    return False
+                
+                # Parse JSON credentials
+                credentials_dict = json.loads(credentials_json)
+                
+                spreadsheet_url = (
+                    st.secrets.get("GOOGLE_SPREADSHEET_URL") or 
+                    st.secrets.get("GOOGLE_SHEET_URL") or
+                    st.secrets.get("spreadsheet_url")
+                )
+                
+                worksheet_name = (
+                    st.secrets.get("GOOGLE_WORKSHEET_NAME") or 
+                    st.secrets.get("worksheet_name", "Session_Audits")
+                )
+            
+            if not spreadsheet_url:
+                st.error("❌ GOOGLE_SPREADSHEET_URL not found in Streamlit secrets")
+                st.info("💡 Make sure you have added the spreadsheet URL in Streamlit Cloud > App Settings > Secrets")
+                return False
+            
+            # Clean URL (remove any query parameters or fragments)
+            if "?" in spreadsheet_url:
+                spreadsheet_url = spreadsheet_url.split("?")[0]
+            if "#" in spreadsheet_url:
+                spreadsheet_url = spreadsheet_url.split("#")[0]
+            
+            st.success(f"✅ Found secrets: URL={spreadsheet_url[:50]}..., Worksheet={worksheet_name}")
+            st.info("🔗 Attempting to connect to Google Sheets...")
+            
+            return self.initialize_connection_from_dict(credentials_dict, spreadsheet_url, worksheet_name)
+            
+        except Exception as e:
+            st.error(f"❌ Error loading Google Sheets secrets: {str(e)}")
+            st.info("💡 Check your Streamlit secrets configuration")
+            return False
+    
+    def initialize_connection_from_dict(self, credentials_dict: dict, spreadsheet_url: str, worksheet_name: str = "Session_Audits"):
+        """Initialize Google Sheets connection using credentials dictionary"""
+        try:
+            st.info("🔐 Creating credentials...")
             
             # Define the scope
             scope = [
                 "https://www.googleapis.com/auth/spreadsheets",
                 "https://www.googleapis.com/auth/drive"
             ]
-            
-            st.info("🔐 Creating credentials...")
             
             # Create credentials
             credentials = Credentials.from_service_account_info(credentials_dict, scopes=scope)
@@ -61,62 +137,9 @@ class GoogleSheetsDB:
             st.success("🎉 Google Sheets connection successful!")
             return True
             
-        except json.JSONDecodeError as e:
-            st.error(f"❌ Invalid JSON credentials: {str(e)}")
-            return False
         except Exception as e:
             st.error(f"❌ Error connecting to Google Sheets: {str(e)}")
             st.info("💡 Make sure the Google Sheet is shared with: physical-form@physical-form.iam.gserviceaccount.com")
-            return False
-    
-    def initialize_connection_from_secrets(self) -> bool:
-        """Initialize connection using Streamlit secrets. Returns True on success."""
-        try:
-            st.info("🔍 Checking Streamlit secrets...")
-            
-            # Try multiple possible secret names for flexibility
-            credentials_json = (
-                st.secrets.get("GOOGLE_SHEETS_CREDENTIALS") or 
-                st.secrets.get("GOOGLE_CREDENTIALS_JSON") or
-                st.secrets.get("credentials_json")
-            )
-            
-            spreadsheet_url = (
-                st.secrets.get("GOOGLE_SPREADSHEET_URL") or 
-                st.secrets.get("GOOGLE_SHEET_URL") or
-                st.secrets.get("spreadsheet_url")
-            )
-            
-            worksheet_name = (
-                st.secrets.get("GOOGLE_WORKSHEET_NAME") or 
-                st.secrets.get("worksheet_name", "Session_Audits")
-            )
-            
-            # Debug logging
-            if not credentials_json:
-                st.error("❌ GOOGLE_SHEETS_CREDENTIALS not found in Streamlit secrets")
-                st.info("💡 Make sure you have added the credentials in Streamlit Cloud > App Settings > Secrets")
-                return False
-                
-            if not spreadsheet_url:
-                st.error("❌ GOOGLE_SPREADSHEET_URL not found in Streamlit secrets")
-                st.info("💡 Make sure you have added the spreadsheet URL in Streamlit Cloud > App Settings > Secrets")
-                return False
-            
-            # Clean URL (remove any query parameters or fragments)
-            if "?" in spreadsheet_url:
-                spreadsheet_url = spreadsheet_url.split("?")[0]
-            if "#" in spreadsheet_url:
-                spreadsheet_url = spreadsheet_url.split("#")[0]
-            
-            st.success(f"✅ Found secrets: URL={spreadsheet_url[:50]}..., Worksheet={worksheet_name}")
-            st.info("🔗 Attempting to connect to Google Sheets...")
-            
-            return self.initialize_connection(credentials_json, spreadsheet_url, worksheet_name)
-            
-        except Exception as e:
-            st.error(f"❌ Error loading Google Sheets secrets: {str(e)}")
-            st.info("💡 Check your Streamlit secrets configuration")
             return False
     
     def _initialize_headers(self):
