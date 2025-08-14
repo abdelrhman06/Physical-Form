@@ -54,14 +54,45 @@ class GoogleSheetsDB:
     def initialize_connection_from_secrets(self) -> bool:
         """Initialize connection using Streamlit secrets. Returns True on success."""
         try:
-            credentials_json = st.secrets.get("GOOGLE_SHEETS_CREDENTIALS") or st.secrets.get("GOOGLE_CREDENTIALS_JSON")
-            spreadsheet_url = st.secrets.get("GOOGLE_SPREADSHEET_URL") or st.secrets.get("GOOGLE_SHEET_URL")
-            worksheet_name = st.secrets.get("GOOGLE_WORKSHEET_NAME", "Session_Audits")
-            if not credentials_json or not spreadsheet_url:
+            # Try multiple possible secret names for flexibility
+            credentials_json = (
+                st.secrets.get("GOOGLE_SHEETS_CREDENTIALS") or 
+                st.secrets.get("GOOGLE_CREDENTIALS_JSON") or
+                st.secrets.get("credentials_json")
+            )
+            
+            spreadsheet_url = (
+                st.secrets.get("GOOGLE_SPREADSHEET_URL") or 
+                st.secrets.get("GOOGLE_SHEET_URL") or
+                st.secrets.get("spreadsheet_url")
+            )
+            
+            worksheet_name = (
+                st.secrets.get("GOOGLE_WORKSHEET_NAME") or 
+                st.secrets.get("worksheet_name", "Session_Audits")
+            )
+            
+            # Debug logging
+            if not credentials_json:
+                st.error("❌ GOOGLE_SHEETS_CREDENTIALS not found in Streamlit secrets")
                 return False
+                
+            if not spreadsheet_url:
+                st.error("❌ GOOGLE_SPREADSHEET_URL not found in Streamlit secrets")
+                return False
+            
+            # Clean URL (remove any query parameters or fragments)
+            if "?" in spreadsheet_url:
+                spreadsheet_url = spreadsheet_url.split("?")[0]
+            if "#" in spreadsheet_url:
+                spreadsheet_url = spreadsheet_url.split("#")[0]
+            
+            st.success(f"✅ Found secrets: URL={spreadsheet_url[:50]}..., Worksheet={worksheet_name}")
+            
             return self.initialize_connection(credentials_json, spreadsheet_url, worksheet_name)
+            
         except Exception as e:
-            st.error(f"Error loading Google Sheets secrets: {str(e)}")
+            st.error(f"❌ Error loading Google Sheets secrets: {str(e)}")
             return False
     
     def _initialize_headers(self):

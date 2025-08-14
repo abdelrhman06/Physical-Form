@@ -628,11 +628,15 @@ def main():
     # Initialize database connection from secrets if available
     db = get_database()
     if not hasattr(st.session_state, 'db_configured'):
+        st.sidebar.info("🔄 Initializing database connection...")
         if db.initialize_connection_from_secrets():
             st.session_state.db_configured = True
             st.session_state.credentials_json = st.secrets.get("GOOGLE_SHEETS_CREDENTIALS") or st.secrets.get("GOOGLE_CREDENTIALS_JSON")
             st.session_state.spreadsheet_url = st.secrets.get("GOOGLE_SPREADSHEET_URL") or st.secrets.get("GOOGLE_SHEET_URL")
             st.session_state.worksheet_name = st.secrets.get("GOOGLE_WORKSHEET_NAME", "Session_Audits")
+            st.sidebar.success("✅ Database connected via secrets!")
+        else:
+            st.sidebar.warning("⚠️ Database not connected. Configure in Admin Panel.")
     
     # Sidebar info
     st.sidebar.markdown("---")
