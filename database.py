@@ -20,6 +20,8 @@ class GoogleSheetsDB:
     def initialize_connection(self, credentials_json: str, spreadsheet_url: str, worksheet_name: str = "Session_Audits"):
         """Initialize Google Sheets connection"""
         try:
+            st.info("📋 Parsing credentials...")
+            
             # Parse credentials
             credentials_dict = json.loads(credentials_json)
             
@@ -29,31 +31,49 @@ class GoogleSheetsDB:
                 "https://www.googleapis.com/auth/drive"
             ]
             
+            st.info("🔐 Creating credentials...")
+            
             # Create credentials
             credentials = Credentials.from_service_account_info(credentials_dict, scopes=scope)
+            
+            st.info("🔌 Initializing client...")
             
             # Initialize the client
             self.client = gspread.authorize(credentials)
             
+            st.info("📄 Opening spreadsheet...")
+            
             # Open the spreadsheet
             self.sheet = self.client.open_by_url(spreadsheet_url)
+            
+            st.info(f"📋 Getting worksheet: {worksheet_name}")
             
             # Get or create worksheet
             try:
                 self.worksheet = self.sheet.worksheet(worksheet_name)
+                st.success(f"✅ Found existing worksheet: {worksheet_name}")
             except gspread.WorksheetNotFound:
+                st.info(f"📝 Creating new worksheet: {worksheet_name}")
                 self.worksheet = self.sheet.add_worksheet(title=worksheet_name, rows=1000, cols=50)
                 self._initialize_headers()
+                st.success(f"✅ Created new worksheet: {worksheet_name}")
             
+            st.success("🎉 Google Sheets connection successful!")
             return True
             
+        except json.JSONDecodeError as e:
+            st.error(f"❌ Invalid JSON credentials: {str(e)}")
+            return False
         except Exception as e:
-            st.error(f"Error connecting to Google Sheets: {str(e)}")
+            st.error(f"❌ Error connecting to Google Sheets: {str(e)}")
+            st.info("💡 Make sure the Google Sheet is shared with: physical-form@physical-form.iam.gserviceaccount.com")
             return False
     
     def initialize_connection_from_secrets(self) -> bool:
         """Initialize connection using Streamlit secrets. Returns True on success."""
         try:
+            st.info("🔍 Checking Streamlit secrets...")
+            
             # Try multiple possible secret names for flexibility
             credentials_json = (
                 st.secrets.get("GOOGLE_SHEETS_CREDENTIALS") or 
@@ -75,10 +95,12 @@ class GoogleSheetsDB:
             # Debug logging
             if not credentials_json:
                 st.error("❌ GOOGLE_SHEETS_CREDENTIALS not found in Streamlit secrets")
+                st.info("💡 Make sure you have added the credentials in Streamlit Cloud > App Settings > Secrets")
                 return False
                 
             if not spreadsheet_url:
                 st.error("❌ GOOGLE_SPREADSHEET_URL not found in Streamlit secrets")
+                st.info("💡 Make sure you have added the spreadsheet URL in Streamlit Cloud > App Settings > Secrets")
                 return False
             
             # Clean URL (remove any query parameters or fragments)
@@ -88,11 +110,13 @@ class GoogleSheetsDB:
                 spreadsheet_url = spreadsheet_url.split("#")[0]
             
             st.success(f"✅ Found secrets: URL={spreadsheet_url[:50]}..., Worksheet={worksheet_name}")
+            st.info("🔗 Attempting to connect to Google Sheets...")
             
             return self.initialize_connection(credentials_json, spreadsheet_url, worksheet_name)
             
         except Exception as e:
             st.error(f"❌ Error loading Google Sheets secrets: {str(e)}")
+            st.info("💡 Check your Streamlit secrets configuration")
             return False
     
     def _initialize_headers(self):
