@@ -29,11 +29,11 @@ class GoogleSheetsDB:
     def initialize_connection_from_secrets(self) -> bool:
         """Initialize connection using Streamlit secrets. Returns True on success."""
         try:
-            st.info("🔍 Checking Streamlit secrets...")
+            # st.info("🔍 Checking Streamlit secrets...")
             
             # Check if using TOML sections format
             if hasattr(st.secrets, 'google_credentials'):
-                st.info("📋 Using TOML sections format...")
+                # st.info("📋 Using TOML sections format...")
                 credentials_dict = {
                     "type": st.secrets.google_credentials.type,
                     "project_id": st.secrets.google_credentials.project_id,
@@ -51,7 +51,7 @@ class GoogleSheetsDB:
                 worksheet_name = st.secrets.google_sheet.worksheet
             else:
                 # Fallback to JSON string format
-                st.info("📋 Using JSON string format...")
+                # st.info("📋 Using JSON string format...")
                 credentials_json = (
                     st.secrets.get("GOOGLE_SHEETS_CREDENTIALS") or 
                     st.secrets.get("GOOGLE_CREDENTIALS_JSON") or
@@ -88,8 +88,8 @@ class GoogleSheetsDB:
             if "#" in spreadsheet_url:
                 spreadsheet_url = spreadsheet_url.split("#")[0]
             
-            st.success(f"✅ Found secrets: URL={spreadsheet_url[:50]}..., Worksheet={worksheet_name}")
-            st.info("🔗 Attempting to connect to Google Sheets...")
+            # st.success(f"✅ Found secrets: URL={spreadsheet_url[:50]}..., Worksheet={worksheet_name}")
+            # st.info("🔗 Attempting to connect to Google Sheets...")
             
             return self.initialize_connection_from_dict(credentials_dict, spreadsheet_url, worksheet_name)
             
@@ -101,7 +101,7 @@ class GoogleSheetsDB:
     def initialize_connection_from_dict(self, credentials_dict: dict, spreadsheet_url: str, worksheet_name: str = "Session_Audits"):
         """Initialize Google Sheets connection using credentials dictionary"""
         try:
-            st.info("🔐 Creating credentials...")
+            # st.info("🔐 Creating credentials...")
             
             # Define the scope
             scope = [
@@ -112,29 +112,29 @@ class GoogleSheetsDB:
             # Create credentials
             credentials = Credentials.from_service_account_info(credentials_dict, scopes=scope)
             
-            st.info("🔌 Initializing client...")
+            # st.info("🔌 Initializing client...")
             
             # Initialize the client
             self.client = gspread.authorize(credentials)
             
-            st.info("📄 Opening spreadsheet...")
+            # st.info("📄 Opening spreadsheet...")
             
             # Open the spreadsheet
             self.sheet = self.client.open_by_url(spreadsheet_url)
             
-            st.info(f"📋 Getting worksheet: {worksheet_name}")
+            # st.info(f"📋 Getting worksheet: {worksheet_name}")
             
             # Get or create worksheet
             try:
                 self.worksheet = self.sheet.worksheet(worksheet_name)
-                st.success(f"✅ Found existing worksheet: {worksheet_name}")
+                # st.success(f"✅ Found existing worksheet: {worksheet_name}")
             except gspread.WorksheetNotFound:
-                st.info(f"📝 Creating new worksheet: {worksheet_name}")
+                # st.info(f"📝 Creating new worksheet: {worksheet_name}")
                 self.worksheet = self.sheet.add_worksheet(title=worksheet_name, rows=1000, cols=50)
                 self._initialize_headers()
-                st.success(f"✅ Created new worksheet: {worksheet_name}")
+                # st.success(f"✅ Created new worksheet: {worksheet_name}")
             
-            st.success("🎉 Google Sheets connection successful!")
+            # st.success("🎉 Google Sheets connection successful!")
             return True
             
         except Exception as e:
